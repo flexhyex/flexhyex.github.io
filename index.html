@@ -61,9 +61,6 @@
     </div>
 
     <script>
-        const channelUsername = "hamster_kombat";
-        const botToken = "7410926036:AAEYrG_FhU2901EeJ8mSx2lwLauTAhKS_y0";
-
         const subscriberData = {
             labels: [],
             datasets: [
@@ -110,76 +107,36 @@
         const mainValue = document.getElementById("mainValue");
         const stats = document.getElementById("stats");
 
-        const subscriberHistory = []; // Храним историю подписчиков за последние 24 часа
+        async function fetchSubscriberData() {
+            const response = await fetch('/get-subscriber-data');
+            const data = await response.json();
 
-        async function fetchSubscribers() {
-            try {
-                const response = await fetch(
-                    `https://api.telegram.org/bot${botToken}/getChatMembersCount?chat_id=@${channelUsername}`
-                );
-                const data = await response.json();
+            const subscriberCount = data.count;
+            const now = new Date();
 
-                if (data.ok) {
-                    return data.result;
-                } else {
-                    throw new Error("Ошибка получения данных");
+            stats.textContent = `↑ ${subscriberCount} (0%)`;
+            stats.style.color = "#00ff00";
+            mainValue.textContent = subscriberCount;
+
+            // Обновляем график только при изменении количества подписчиков
+            if (subscriberCount !== previousCount) {
+                subscriberData.labels.push(now.toLocaleTimeString());
+                subscriberData.datasets[0].data.push(subscriberCount);
+
+                if (subscriberData.labels.length > 30) {
+                    subscriberData.labels.shift();
+                    subscriberData.datasets[0].data.shift();
                 }
-            } catch (error) {
-                console.error("Ошибка:", error);
-                return null;
+
+                subscriberData.datasets[0].borderColor = "#00ff00";
+                subscriberChart.update();
             }
+
+            previousCount = subscriberCount;
         }
 
-        async function updateSubscribers() {
-            const subscriberCount = await fetchSubscribers();
-
-            if (subscriberCount !== null) {
-                const now = new Date();
-
-                // Добавляем текущее значение в историю
-                subscriberHistory.push({
-                    time: now,
-                    count: subscriberCount,
-                });
-
-                // Удаляем записи старше 24 часов
-                const cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                while (subscriberHistory.length > 0 && subscriberHistory[0].time < cutoffTime) {
-                    subscriberHistory.shift();
-                }
-
-                // Подсчет прироста за 24 часа
-                const earliest = subscriberHistory[0]?.count || subscriberCount;
-                const difference = subscriberCount - earliest;
-                const percentageChange = ((difference / earliest) * 100).toFixed(2);
-                const isIncrease = difference >= 0;
-                const arrow = isIncrease ? "↑" : "↓";
-                const color = isIncrease ? "#00ff00" : "#ff0000";
-
-                stats.textContent = `${arrow} ${difference} (${percentageChange}%)`;
-                stats.style.color = color;
-                mainValue.textContent = subscriberCount;
-
-                // Обновляем график только при изменении количества подписчиков
-                if (subscriberCount !== previousCount) {
-                    subscriberData.labels.push(now.toLocaleTimeString());
-                    subscriberData.datasets[0].data.push(subscriberCount);
-
-                    if (subscriberData.labels.length > 30) {
-                        subscriberData.labels.shift();
-                        subscriberData.datasets[0].data.shift();
-                    }
-
-                    subscriberData.datasets[0].borderColor = color;
-                    subscriberChart.update();
-                }
-
-                previousCount = subscriberCount;
-            }
-        }
-// 1
-        setInterval(updateSubscribers, 10000);
-        updateSubscribers();
+        setInterval(fetchSubscriberData, 10000);
+        fetchSubscriberData();
     </script>
 </body>
 </html>
