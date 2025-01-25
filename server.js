@@ -1,75 +1,148 @@
-// server.js
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscriber Count</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            font-family: "Courier New", Courier, monospace;
+            color: #ffffff;
+        }
 
-const botToken = "7410926036:AAEYrG_FhU2901EeJ8mSx2lwLauTAhKS_y0";
-const channelUsername = "hamster_kombat";
-const dataFilePath = path.join(__dirname, 'subscriberData.json');
+        .widget {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            width: 300px;
+            height: 150px;
+            position: relative;
+        }
 
-// Функция для получения количества подписчиков
-function fetchSubscribers(callback) {
-    const url = `https://api.telegram.org/bot${botToken}/getChatMembersCount?chat_id=@${channelUsername}`;
+        .stats {
+            font-size: 1.5rem;
+            margin-left: 5px;
+        }
 
-    https.get(url, (res) => {
-        let data = '';
+        .main-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #ffffff;
+            margin-left: 5px;
+        }
 
-        res.on('data', chunk => {
-            data += chunk;
-        });
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
 
-        res.on('end', () => {
-            const result = JSON.parse(data);
-            if (result.ok) {
-                callback(null, result.result);
-            } else {
-                callback('Ошибка при получении данных о подписчиках');
+        .widget canvas {
+            position: absolute;
+            top: 40px;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="widget">
+        <div class="main-value" id="mainValue">0</div>
+        <div class="stats" id="stats">↑ 0 (0%)</div>
+        <div class="container">
+            <canvas id="subscriberChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const subscriberData = {
+            labels: [],
+            datasets: [
+                {
+                    data: [],
+                    borderColor: "#00ff00",
+                    backgroundColor: "transparent",
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: 0,
+                },
+            ],
+        };
+
+        const config = {
+            type: "line",
+            data: subscriberData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false,
+                    },
+                },
+                scales: {
+                    x: {
+                        display: false,
+                    },
+                    y: {
+                        display: false,
+                    },
+                },
+                animation: {
+                    duration: 0,
+                },
+            },
+        };
+
+        const ctx = document.getElementById("subscriberChart").getContext("2d");
+        const subscriberChart = new Chart(ctx, config);
+
+        const mainValue = document.getElementById("mainValue");
+        const stats = document.getElementById("stats");
+
+        async function fetchSubscriberData() {
+            try {
+                const response = await fetch("https://your-repository-url/subscribers.json");
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error("Error fetching subscriber data:", error);
+                return null;
             }
-        });
-    }).on('error', (err) => {
-        callback(err);
-    });
-}
+        }
 
-// Сохранение данных в JSON файл
-function saveSubscriberData(count) {
-    const timestamp = new Date().toISOString();
-    const data = {
-        timestamp,
-        count,
-    };
+        async function updateSubscribers() {
+            const subscriberDataArr = await fetchSubscriberData();
 
-    fs.writeFileSync(dataFilePath, JSON.stringify(data, null, 2));
-}
+            if (subscriberDataArr) {
+                const latestData = subscriberDataArr[subscriberDataArr.length - 1];
+                const subscriberCount = latestData.count;
+                const timestamp = new Date(latestData.timestamp).toLocaleTimeString();
+                
+                mainValue.textContent = subscriberCount;
+                stats.textContent = `↑ ${subscriberCount}`;
 
-// Создаем HTTP сервер
-http.createServer((req, res) => {
-    if (req.url === '/get-subscriber-data') {
-        fs.readFile(dataFilePath, 'utf8', (err, data) => {
-            if (err) {
-                res.writeHead(500, { 'Content-Type': 'text/plain' });
-                res.end('Ошибка сервера');
-                return;
+                // Add to graph
+                subscriberData.labels.push(timestamp);
+                subscriberData.datasets[0].data.push(subscriberCount);
+
+                if (subscriberData.labels.length > 30) {
+                    subscriberData.labels.shift();
+                    subscriberData.datasets[0].data.shift();
+                }
+
+                subscriberChart.update();
             }
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(data);
-        });
-    } else if (req.url === '/update-subscriber-data') {
-        fetchSubscribers((error, count) => {
-            if (error) {
-                res.writeHead(500, { 'Content-Type': 'text/plain' });
-                res.end('Ошибка при получении данных');
-                return;
-            }
-            saveSubscriberData(count);
-            res.writeHead(200, { 'Content-Type': 'text/plain' });
-            res.end('Данные обновлены');
-        });
-    } else {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Страница не найдена');
-    }
-}).listen(3000, () => {
-    console.log('Сервер работает на порту 3000');
-});
+        }
+
+        setInterval(updateSubscribers, 10000);
+        updateSubscribers();
+    </script>
+</body>
+</html>

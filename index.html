@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>НЕ ФОНД SCP</title>
+    <title>Subscriber Count</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
@@ -103,24 +103,33 @@
         const ctx = document.getElementById("subscriberChart").getContext("2d");
         const subscriberChart = new Chart(ctx, config);
 
-        let previousCount = 0;
         const mainValue = document.getElementById("mainValue");
         const stats = document.getElementById("stats");
 
         async function fetchSubscriberData() {
-            const response = await fetch('/get-subscriber-data');
-            const data = await response.json();
+            try {
+                const response = await fetch("https://your-repository-url/subscribers.json");
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error("Error fetching subscriber data:", error);
+                return null;
+            }
+        }
 
-            const subscriberCount = data.count;
-            const now = new Date();
+        async function updateSubscribers() {
+            const subscriberDataArr = await fetchSubscriberData();
 
-            stats.textContent = `↑ ${subscriberCount} (0%)`;
-            stats.style.color = "#00ff00";
-            mainValue.textContent = subscriberCount;
+            if (subscriberDataArr) {
+                const latestData = subscriberDataArr[subscriberDataArr.length - 1];
+                const subscriberCount = latestData.count;
+                const timestamp = new Date(latestData.timestamp).toLocaleTimeString();
+                
+                mainValue.textContent = subscriberCount;
+                stats.textContent = `↑ ${subscriberCount}`;
 
-            // Обновляем график только при изменении количества подписчиков
-            if (subscriberCount !== previousCount) {
-                subscriberData.labels.push(now.toLocaleTimeString());
+                // Add to graph
+                subscriberData.labels.push(timestamp);
                 subscriberData.datasets[0].data.push(subscriberCount);
 
                 if (subscriberData.labels.length > 30) {
@@ -128,15 +137,12 @@
                     subscriberData.datasets[0].data.shift();
                 }
 
-                subscriberData.datasets[0].borderColor = "#00ff00";
                 subscriberChart.update();
             }
-
-            previousCount = subscriberCount;
         }
 
-        setInterval(fetchSubscriberData, 10000);
-        fetchSubscriberData();
+        setInterval(updateSubscribers, 10000);
+        updateSubscribers();
     </script>
 </body>
 </html>

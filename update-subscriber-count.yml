@@ -1,0 +1,32 @@
+name: Update Subscriber Count
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Запускать каждую минуту (или настройте по необходимости)
+  workflow_dispatch: # Можно запускать вручную
+
+jobs:
+  update_subscriber_count:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run script to update subscribers
+        run: node update-subscriber-count.js
+
+      - name: Commit updated subscriber data
+        run: |
+          git config --local user.name "github-actions"
+          git config --local user.email "github-actions@github.com"
+          git add subscribers.json
+          git commit -m "Update subscriber count"
+          git push
